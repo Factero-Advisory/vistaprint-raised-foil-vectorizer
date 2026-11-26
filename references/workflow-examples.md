@@ -122,6 +122,46 @@ checkbox states after each click (the grid moves). Confirm in the document:
 vp.panel(0).shapes.filter(s => s.overprints).length;   // number of foiled shapes
 ```
 
+### 6b. Raised foil postcard from layered SVGs, via a foil template
+
+Raised foil postcard 6 x 9 in; the user gave two Illustrator layers at trim size
+(432 x 648 pt): a green checkerboard (background) and gold ornaments + wordmark (foil).
+The user first opened, by hand, a Vistaprint raised foil template (URL with
+`template=...`); a blank postcard has no per-element foil ticks.
+
+```bash
+python scripts/svg_pieces.py background.svg bg_pieces.svg --rows   # 10 rows by colour
+python scripts/svg_pieces.py gold.svg gold_pieces.svg              # 33 pieces
+```
+```js
+const MM = 72 / 25.4, panel = vp.panel(0);
+const W = parseFloat(panel.width) * MM, H = parseFloat(panel.height) * MM;
+vp.ART = { w: W, h: H };                       // not the business-card default
+const dx = (W - 432) / 2, dy = (H - 648) / 2;  // trim centred in the bleed
+// background: z from 1001, snap its outer edges (x = dx, x = dx + 432, y = dy + 648) to 0 / W / H
+// gold: z above the background, fill vp.hexToRgb('#cc8525'); keep their ids
+vp.exec(c => { for (const s of shapes) c.document.panels[0].shapes.push(s); });
+vp.check();                                    // ok: true
+```
+Finishes panel (template unlocks it): checkbox `images.length + i` is shape `i`.
+```js
+const ready = async () => { for (let t = 0; t < 40; t++) { const c = document.querySelectorAll('input[type=checkbox][aria-label="Apply finish"]'); if (c.length >= expected) return [...c]; await new Promise(r => setTimeout(r, 500)); } };
+for (const i of goldIdx) { if (vp.panel(0).shapes.find(s => s.id === ids[i]).overprints) continue;
+  const cbs = await ready(); cbs[nImages + i].scrollIntoView({ block: 'center' });
+  cbs[nImages + i].click(); await new Promise(r => setTimeout(r, 1500)); }   // reopen the panel if it closed, rerun
+```
+Then delete the template, on both sides, and save for real:
+```js
+vp.exec(c => { for (const p of c.document.panels) { p.images.splice(0); p.textAreas.splice(0);
+  p.itemReferences && p.itemReferences.splice(0);
+  for (let k = p.shapes.length - 1; k >= 0; k--) if (!ids.includes(p.shapes[k].id)) p.shapes.splice(k, 1); } });
+// click the toolbar Save button, wait for "Saved to My Projects", reload (?workId=...), reinstall,
+// expect 0 images, 0 text, 43 shapes, 33 with overprints, vp.check().ok
+```
+Pixel check: draw both SVGs and the shapes at 4 px/pt on the trim area (viewBox in pt,
+position in mm). Result here: 0.11 % of pixels differ by more than 10 levels, max 95, all
+anti-aliased edges.
+
 ## 7. Recolour to exact hex
 
 ```js

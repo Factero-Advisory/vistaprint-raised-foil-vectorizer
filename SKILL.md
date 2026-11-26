@@ -8,7 +8,8 @@ description: Rebuild a user's own logo, text or PNG artwork as native Vistaprint
 Turns artwork into native **curve shapes** inside Vistaprint Studio: same position, exact
 colours, crisp at any size, and eligible for **raised foil**, which Vistaprint offers only
 on editor elements (text and shapes), never on uploaded images. Proven on four business
-cards (front and back), October 2026.
+cards (front and back), October 2026, and on a 6 x 9 in raised gold foil postcard,
+November 2026.
 
 Read `private/notes.md` first if it exists: it holds the user's own designs, colours,
 measured transforms and history. It is never published.
@@ -68,7 +69,8 @@ The toolkit runs inside the page:
 
 | Step | Do | Toolkit / script |
 |---|---|---|
-| A. Inventory | Panels, sizes, images, shapes; baseline check | `vp.summary()`, `vp.check()` |
+| 0. Template (user) | The user manually opens a Vistaprint template that already has raised foil; Claude waits for it | — |
+| A. Inventory | Panels, sizes, images, shapes, foiled elements and their spot name; baseline check | `vp.summary()`, `vp.check()` |
 | B. Read | Load each image, enlarge areas in an overlay, read every word | `vp.panelImage(i)`, `vp.zoomImage()`, `vp.overlay()` |
 | C. Pick a source per element | See table below | — |
 | D. Prepare locally | Compose text, split SVGs, clean overlaps | `compose_spec.py`, `svg_pieces.py`, `clean_overlaps.py` |
@@ -77,7 +79,8 @@ The toolkit runs inside the page:
 | G. Inject | Build shapes, push them in one command | `vp.shape()`, `vp.exec()` |
 | H. Verify | Numbers, then eyes (section 5) | `vp.diff()`, `vp.check()`, `vp.renderShapes()` |
 | I. Replace | Remove the image, wait for save, reload, re-check | `vp.exec()`, `vp.saved()` |
-| J. Foil (optional) | Finishes panel, tick the shapes | UI clicks, then read `overprints` |
+| J. Foil (optional) | Finishes panel, tick the foil shapes (wait for the panel, scroll, click, re-read `overprints`) | UI clicks, then read `overprints` |
+| K. Clean up | Delete every template element on both sides, click Save, reload, re-check, pixel check against the SVGs | `vp.exec()`, Save button, `vp.check()` |
 
 **Choosing the source of each element** (best first):
 
@@ -99,6 +102,24 @@ A full worked example of every case is in `references/workflow-examples.md`.
   approximations drift (cmyk(3, 3, 0, 25) shows as #BABABF, not #B8B8BE).
 - Raised foil = `overprints: ["spot(RaisedFoilSilver)"]` (or Gold), written by the
   Finishes panel; Vistaprint then drops the shape's `color`.
+- **Start from a raised foil template, chosen manually by the user.** Before any
+  injection, the user picks in Vistaprint a template that already has raised foil on some
+  elements; never pick it for them and never start from a blank design. Inventory it
+  (`vp.summary()` lists `overprints`) and read the exact spot name from a foiled template
+  element, e.g. `spot(RaisedFoilGold)`. If no element carries `overprints`, stop and ask
+  the user to choose another template. A blank raised foil postcard only offers "Text only
+  / Image only / Text and images" with no per-shape ticks: the template is what unlocks
+  per-element ticking.
+- Then: insert the vectors through the API, tick the foil shapes in the Finishes panel
+  (one "Apply finish" checkbox per image then per shape, panel reloads itself: wait,
+  scroll, click, drive the loop from `overprints`), **delete everything that belonged to
+  the template on both sides** (text boxes, background image, lines, rectangles,
+  references), click Save, reload and re-check. Details in
+  `references/editor-internals.md` section 5.
+- Never type in a Finishes Instructions box without the user's approval of the exact text.
+- Other products: set `vp.ART` to the panel size in points (panel mm x 72 / 25.4) before
+  building shapes. An SVG drawn at trim size goes at offset ((panel - trim) / 2) on each
+  axis; snap a full-bleed background's outer edges to 0 and to the panel size.
 - Outline-only shape: no `color` + `stroke {color, thickness}`; the server normalises it to
   `color: "cmyka(0,0,0,0,0)"`.
 - Vistaprint fills with the **even-odd** rule. Every filled shape must be overlap-free.
