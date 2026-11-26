@@ -101,27 +101,29 @@ The working method:
    Text / Images / Shapes, one `input[type=checkbox][aria-label="Apply finish"]` per image
    and shape, plus text checkboxes. Template text foil is stored inside the text content
    (`content[].overprints: ["spot(RaisedFoilGold)"]`); read the spot name there.
-2. Insert the vectors through the API (`vp.shape` + `vp.exec`), z-index above the template
-   (e.g. from 1001), background first, foil pieces after.
+2. Insert the vectors through the API: `vp.placeSvg(text, {trim, fullBleed, z})` then
+   `vp.inject(shapes)`, z-index above the template (from 1001), background first, foil
+   pieces after.
 3. Tick the foil shapes in the Finishes panel. The "Apply finish" thumbnails follow the
    images first, then the shapes in `panel.shapes` order, so shape `i` is checkbox
    `images.length + i`; confirm on one tick by reading which shape got `overprints`.
    The panel closes and reloads by itself after some ticks: before each click wait until
    all checkboxes are present again, `scrollIntoView` the checkbox, click, wait about
    1.5 s, and drive the loop from the document (skip shapes that already have
-   `overprints`), never from checkbox positions.
+   `overprints`), never from checkbox positions. `vp.tickFoil(ids)` does all of this.
 4. Delete everything that belonged to the template, on both sides: images (background,
    lines), text areas, background rectangles, shapes that are not yours,
-   `itemReferences`. Foil on your shapes survives the removal.
+   `itemReferences`. Foil on your shapes survives the removal. `vp.removeTemplate(ids)`.
 5. Save explicitly: `vp.saved()` can answer "Saved" before the autosave starts, and a
    removal was lost that way. Wait for "Save", click the toolbar Save button ("Saved to My
    Projects" toast), then reload (the URL becomes `?workId=...`), reinstall, and check:
-   no template element left, foil count, `vp.check()`.
+   no template element left (`vp.templateItems(ids)`), foil count, `vp.check()`.
+   `vp.saveNow()` does the save part.
 6. Pixel check against the source SVGs: draw the SVGs and the shapes on two canvases at
    4 px/pt over the trim area and count differing pixels. Shape `viewBox` values are path
    units (points), not mm, even though they carry "mm": scale = position (pt) / viewBox.
    Reference result: 0.11 % of pixels differ by more than 10 levels, all on anti-aliased
-   edges.
+   edges. `vp.pixelCheck(svgTexts, {trim})`.
 
 Writing `overprints` directly with `vp.exec` on a blank postcard also renders as foil in
 the Studio, but it bypasses the panel; use it only if the user asks, after the template

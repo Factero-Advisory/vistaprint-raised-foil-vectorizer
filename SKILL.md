@@ -1,6 +1,6 @@
 ---
 name: vistaprint-raised-foil-vectorizer
-description: Rebuild a user's own logo, text or PNG artwork as native Vistaprint Studio vector shapes so it prints sharp and can take raised foil (which Vistaprint refuses on uploaded designs). Use whenever the user mentions Vistaprint, Vistaprint Studio, a business card / carte d'affaires, raised foil / foil / finition, a blurry or low-resolution PNG on a card, vectorising / vectoriser a logo or text, replacing an image by shapes (formes), exact hex colours in the Studio, clipped or cut letters on a card, changing text (phone, email, title) on a card made of shapes, or repairing shapes made earlier with this skill — even if they do not say "vector". Covers SVG imports from Illustrator, font identification and composition (Epilogue bundled), sub-pixel tracing as a last resort, even-odd-safe outlines, injection through the editor's own command API, foil via the Finishes panel, and verification. Not for ordering, checkout or cart actions.
+description: Rebuild a user's own logo, text or PNG artwork as native Vistaprint Studio vector shapes so it prints sharp and can take raised foil (which Vistaprint refuses on uploaded designs). Use whenever the user mentions Vistaprint, Vistaprint Studio, a business card / carte d'affaires, a raised foil postcard / carte postale, a Vistaprint foil template, raised foil / foil / finition, a blurry or low-resolution PNG on a card, vectorising / vectoriser a logo or text, replacing an image by shapes (formes), exact hex colours in the Studio, clipped or cut letters on a card, changing text (phone, email, title) on a card made of shapes, or repairing shapes made earlier with this skill — even if they do not say "vector". Covers SVG imports from Illustrator, font identification and composition (Epilogue bundled), sub-pixel tracing as a last resort, even-odd-safe outlines, injection through the editor's own command API, foil via the Finishes panel, and verification. Not for ordering, checkout or cart actions.
 ---
 
 # Vistaprint raised-foil vectorizer
@@ -31,6 +31,10 @@ measured transforms and history. It is never published.
   `vp.check()` fails: then **stop**, show the numbers to the user and ask. Pass
   `userApproved` only with the user's own words from the chat, never on your own judgement.
   Removal is undoable (Ctrl+Z, Version History), but say what you removed.
+- Elements that came with a Vistaprint template the user opened (stock text boxes,
+  background image, lines, rectangles) are not the user's artwork: delete them all, on
+  both sides, with `vp.removeTemplate(keepIds)` once your shapes are in, and report the
+  counts.
 - Do not force a navigation when the Studio reports unsaved changes: wait for "Saved".
 - Bundled fonts (Epilogue roman and italic, OFL) need no download. Any other font file is
   a download: ask first, with file name, source and size.
@@ -69,8 +73,8 @@ The toolkit runs inside the page:
 
 | Step | Do | Toolkit / script |
 |---|---|---|
-| 0. Template (user) | The user manually opens a Vistaprint template that already has raised foil; Claude waits for it | — |
-| A. Inventory | Panels, sizes, images, shapes, foiled elements and their spot name; baseline check | `vp.summary()`, `vp.check()` |
+| 0. Template (user) | The user manually opens a Vistaprint template that already has raised foil; Claude waits for it | none |
+| A. Inventory | Panels, sizes, images, shapes, foiled elements and their spot name; baseline check | `vp.summary()`, `vp.foilSpot()`, `vp.check()` |
 | B. Read | Load each image, enlarge areas in an overlay, read every word | `vp.panelImage(i)`, `vp.zoomImage()`, `vp.overlay()` |
 | C. Pick a source per element | See table below | — |
 | D. Prepare locally | Compose text, split SVGs, clean overlaps | `compose_spec.py`, `svg_pieces.py`, `clean_overlaps.py` |
@@ -79,8 +83,8 @@ The toolkit runs inside the page:
 | G. Inject | Build shapes, push them in one command | `vp.shape()`, `vp.exec()` |
 | H. Verify | Numbers, then eyes (section 5) | `vp.diff()`, `vp.check()`, `vp.renderShapes()` |
 | I. Replace | Remove the image, wait for save, reload, re-check | `vp.exec()`, `vp.saved()` |
-| J. Foil (optional) | Finishes panel, tick the foil shapes (wait for the panel, scroll, click, re-read `overprints`) | UI clicks, then read `overprints` |
-| K. Clean up | Delete every template element on both sides, click Save, reload, re-check, pixel check against the SVGs | `vp.exec()`, Save button, `vp.check()` |
+| J. Foil (optional) | Finishes panel, tick the foil shapes (wait for the panel, scroll, click, re-read `overprints`) | `vp.tickFoil(ids)` |
+| K. Clean up | Delete every template element on both sides, save for real, reload, re-check, pixel check against the SVGs | `vp.removeTemplate(ids)`, `vp.saveNow()`, `vp.templateItems(ids)`, `vp.check()`, `vp.pixelCheck()` |
 
 **Choosing the source of each element** (best first):
 
@@ -110,16 +114,17 @@ A full worked example of every case is in `references/workflow-examples.md`.
   the user to choose another template. A blank raised foil postcard only offers "Text only
   / Image only / Text and images" with no per-shape ticks: the template is what unlocks
   per-element ticking.
-- Then: insert the vectors through the API, tick the foil shapes in the Finishes panel
-  (one "Apply finish" checkbox per image then per shape, panel reloads itself: wait,
-  scroll, click, drive the loop from `overprints`), **delete everything that belonged to
-  the template on both sides** (text boxes, background image, lines, rectangles,
-  references), click Save, reload and re-check. Details in
+- Then: insert the vectors through the API (`vp.placeSvg` + `vp.inject`), tick the foil
+  shapes in the Finishes panel (`vp.tickFoil`), **delete everything that belonged to the
+  template on both sides** (`vp.removeTemplate`: text boxes, background image, lines,
+  rectangles, references), `vp.saveNow()`, reload, reinstall, `vp.templateItems` must be
+  empty, then `vp.pixelCheck` against the source SVGs. Details in
   `references/editor-internals.md` section 5.
 - Never type in a Finishes Instructions box without the user's approval of the exact text.
-- Other products: set `vp.ART` to the panel size in points (panel mm x 72 / 25.4) before
-  building shapes. An SVG drawn at trim size goes at offset ((panel - trim) / 2) on each
-  axis; snap a full-bleed background's outer edges to 0 and to the panel size.
+- Other products: `vp.artFromPanel()` sets `vp.ART` to the panel size in points. An SVG
+  drawn at trim size goes at offset ((panel - trim) / 2) on each axis, and a full-bleed
+  background's outer edges are snapped to the panel edges: `vp.placeSvg(text, {trim,
+  fullBleed: true})`.
 - Outline-only shape: no `color` + `stroke {color, thickness}`; the server normalises it to
   `color: "cmyka(0,0,0,0,0)"`.
 - Vistaprint fills with the **even-odd** rule. Every filled shape must be overlap-free.
@@ -147,8 +152,8 @@ More in `references/editor-internals.md`.
 2. Inject in a loud colour (magenta) over the image, zoom: no original colour may show.
 3. `vp.check()` must return `ok: true` (no even-odd mismatch, no stray M).
 4. Set the real colours, remove the image with
-   `vp.removeImage(panel, imageId, [{name, kind, diff}, ...])`, `await vp.saved()` until
-   "Saved", copy `vp.log` to the session log, reload the page, reinstall the toolkit, run
+   `vp.removeImage(panel, imageId, [{name, kind, diff}, ...])`, `await vp.saveNow()`
+   (`vp.saved()` alone can answer "Saved" before the autosave starts), copy `vp.log` to the session log, reload the page, reinstall the toolkit, run
    `vp.summary()` and `vp.check()` again. If `vp.removeImage()` says "STOP", the image
    stays: report its message to the user and wait for their decision.
 

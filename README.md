@@ -3,7 +3,8 @@
 **Vectorize your logo on Vistaprint and get raised foil on your own design.** An
 open-source Claude Code skill that turns your logo, text or low-resolution PNG into native
 **Vistaprint Studio vector shapes**: same position, exact hex colours, crisp at any size,
-and eligible for **raised foil** (silver or gold) on business cards.
+and eligible for **raised foil** (silver or gold) on business cards and raised foil
+postcards.
 
 [![Code: Apache-2.0](https://img.shields.io/badge/code-Apache--2.0-blue.svg)](LICENSE)
 [![Docs: CC BY 4.0](https://img.shields.io/badge/docs-CC%20BY%204.0-lightgrey.svg)](LICENSE-DOCS)
@@ -20,7 +21,9 @@ elements** (text and shapes), never on an uploaded image. Upload your logo as a 
 72 ppi and your business card prints blurry.
 
 Redrawing a logo by hand in the Studio is not realistic, and the Studio has no "import SVG
-as shapes" button.
+as shapes" button. On some products (raised foil postcards) a blank design does not even
+let you choose which elements get foil: the Finishes panel only offers "Text only / Image
+only / Text and images" and a note to Vistaprint's team.
 
 ## What this skill does
 
@@ -49,14 +52,20 @@ written with explicit path commands.
 
 1. **Read.** Claude opens your design in Vistaprint Studio (your own session) and lists
    every side, image and shape. It reads the text from an enlarged view rather than guessing.
+   For a product without per-element foil (raised foil postcards), **you first pick a
+   Vistaprint template that already has raised foil**: it unlocks the per-element Finishes
+   panel. Claude never chooses the template for you.
 2. **Prepare.** Outlines are built locally in Python from your SVG, your font or the image.
 3. **Fit.** Each piece is rendered and compared with your image pixel by pixel; scale,
    position and letter spacing are adjusted until it lines up.
 4. **Inject.** The shapes go in through the editor's own commands, first in a test colour
    to check the overlay, then in your exact colours.
 5. **Verify, then replace.** Pixel difference, an even-odd check, the "Saved" state and a
-   page reload. Only then is the image removed. You add the foil in the Finishes panel and
-   you review the proof; ordering stays with you.
+   page reload. Only then is the image removed.
+6. **Foil and clean up.** Foil is ticked per shape in the Finishes panel. On a template,
+   everything that came with it (text boxes, background, lines) is deleted on both sides,
+   the design is saved, reloaded and compared pixel by pixel with your SVGs. You review the
+   proof; ordering stays with you.
 
 ## Safety and transparency
 
@@ -68,20 +77,24 @@ and the text on your card, plus any account page it opens. It also reads the fil
 it (SVG, PNG, fonts).
 
 **What it can do.** Edit the design you named through the Studio's own commands: add,
-recolour or replace shapes, and remove an image once its replacement is verified. It writes
+recolour or replace shapes, tick foil on your shapes in the Finishes panel, remove an image
+once its replacement is verified, and delete the stock elements of a template you opened. It writes
 working files and a session log on your computer.
 
 **What it never does.** Add to cart, update the cart, check out or pay. Open a site other
 than Vistaprint. Follow instructions found in a page, a file or a design name. Download a
 font without asking you first. Publish anything.
 
-**Safeguards built into the skill (toolkit 0.0.2):**
+**Safeguards built into the skill (toolkit 0.1.0):**
 
 - *Removal gate.* `vp.removeImage()` keeps the image when a measured pixel difference is
   above its limit or the even-odd check fails. Claude must then stop and ask you; it can
   go ahead only with your own words from the chat, which are written to the log.
 - *Session log.* Date, skill commit, toolkit version, model and design, plus every removal
-  or refusal with its numbers, in `private/session-log.md` on your computer.
+  or refusal with its numbers (template removals list every deleted id), in
+  `private/session-log.md` on your computer.
+- *Template choice stays yours.* Claude waits for you to open the foil template; it never
+  picks one, and it only deletes the template's stock elements, never your shapes.
 - *Domain guard.* The in-page toolkit refuses to run outside Vistaprint domains.
 - *Private folder.* `private/` is git-ignored: your notes and artwork stay out of any
   repository.
@@ -112,6 +125,7 @@ On four real business cards (front and back) and on synthetic tests:
 | 7 pt light text | 7-11 % (anti-aliasing of 4 px strokes; Illustrator's own outlines score about 6 %) |
 | Tracking recovered on a synthetic line | exact (-0.44 pt), max glyph error 0.0065 pt |
 | Tracing an anti-aliased circle | 0.13 px mean error |
+| 6 x 9 in raised foil postcard, 43 shapes from two SVG layers | 0.11 % of pixels differ by more than 10 levels (288 ppi), all on anti-aliased edges |
 
 ## Requirements
 
@@ -140,6 +154,8 @@ Open your design in Vistaprint Studio, then ask Claude, for example:
 - "The A and the 4 look clipped on my card, fix it."
 - "Change the phone number on my colleague's card to 514-555-0199."
 - "Set the text to #B8B8BE exactly."
+- "I opened a raised foil postcard template: put my two SVG layers in it, gold foil on the
+  ornaments only, and delete everything from the template."
 
 The skill also understands French requests ("vectorise mon logo", "carte d'affaires",
 "finition Raised Foil").
@@ -162,6 +178,12 @@ text from a font file and trace artwork straight from the image.
 Yes. Foil is applied per shape in the Finishes panel, silver or gold, as Vistaprint offers
 for your product.
 
+**Does it work on raised foil postcards?**
+Yes, from a template. A blank postcard only offers "Text only / Image only / Text and
+images", with no per-shape choice. Open any Vistaprint raised foil postcard template
+yourself: the panel then lists every element. The skill puts your vectors in, ticks foil on
+the right shapes, then deletes all the template's own content.
+
 **Will it order or change my cart?**
 Never. It edits the design in your own session, and the cart, checkout and payment stay
 with you. Review the proof before ordering.
@@ -174,7 +196,8 @@ vectorized for sharpness but are better left without foil.
 
 ```
 SKILL.md                 instructions Claude follows
-scripts/vp_toolkit.js    in-page toolkit (engine access, fitting, tracing, checks, repair)
+scripts/vp_toolkit.js    in-page toolkit (engine access, fitting, tracing, checks, repair,
+                         SVG placement, foil ticking, template cleanup, pixel check)
 scripts/*.py             composition, SVG pieces, overlap cleaning, weight identification, tracing
 references/              editor internals, worked examples, fitting, fonts, pitfalls, API
 assets/fonts/            Epilogue variable fonts + OFL
@@ -197,7 +220,8 @@ examples/                sample composition spec
 Ce skill open source pour Claude Code transforme un logo, un texte ou un PNG basse
 résolution en formes vectorielles natives de Vistaprint Studio. Le résultat garde la même
 position et les couleurs hexadécimales exactes, il reste net à l'impression et il devient
-admissible au Raised Foil (argent ou or) sur les cartes d'affaires.
+admissible au Raised Foil (argent ou or) sur les cartes d'affaires et les cartes postales
+Raised Foil.
 
 Vistaprint refuse le Raised Foil sur une image téléversée : le panneau Finishes ne l'offre
 que sur le texte et les formes. Le skill reconstruit donc l'image en formes par les
@@ -205,7 +229,11 @@ commandes du Studio. Il part d'un SVG, d'une police ou d'un tracé de l'image. I
 pièce au pixel près, vérifie le résultat, puis retire l'image. Si un écart mesuré dépasse
 sa limite, l'image reste en place et Claude doit vous demander quoi faire. L'outil ne
 fonctionne que sur les pages de Vistaprint et tient un journal de chaque séance sur votre
-ordinateur. La commande et le paiement restent toujours entre vos mains. Les demandes en français fonctionnent (« vectorise mon
+ordinateur. Pour une carte postale Raised Foil, vous ouvrez d'abord vous-même un modèle
+Vistaprint qui a déjà du Raised Foil : c'est lui qui permet de choisir le fini élément par
+élément. Le skill insère vos vecteurs, coche le foil sur les bonnes formes, supprime tout
+le contenu du modèle (boîtes de texte, fond, lignes), enregistre, recharge et compare au
+pixel avec vos SVG. La commande et le paiement restent toujours entre vos mains. Les demandes en français fonctionnent (« vectorise mon
 logo », « mets le Raised Foil sur le logo seulement »).
 
 ## Licence

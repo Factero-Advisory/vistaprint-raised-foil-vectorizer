@@ -1,4 +1,4 @@
-# vp_toolkit.js API (version 0.0.2)
+# vp_toolkit.js API (version 0.1.0)
 
 Install in the page (see SKILL.md section 2); everything lives on `window.__vp`.
 Units: artboard points unless stated. `I` = image object from `vp.image()` /
@@ -13,9 +13,9 @@ Units: artboard points unless stated. `I` = image object from `vp.image()` /
 | `vp.doc()` | cimDoc JSON |
 | `vp.panel(i)` | panel `i` (0 = front, 1 = back) |
 | `vp.exec(cimDoc => {...})` | runs a mutation through the editor's command API (undoable, autosaved) |
-| `vp.summary()` | sides, sizes, images, shapes, text areas |
+| `vp.summary()` | sides, sizes, images, shapes (with `overprints`), text areas, foiled text areas |
 | `vp.scale(panel)` | `{SX, SY}` mm per artboard point |
-| `vp.ART` | artboard size `{w, h}` in pt (default 259.92 x 151.92); change it for other products |
+| `vp.ART` | artboard size `{w, h}` in pt (default 259.92 x 151.92, a business card); `vp.artFromPanel()` sets it for other products |
 
 ## Paths
 
@@ -71,3 +71,20 @@ Units: artboard points unless stated. `I` = image object from `vp.image()` /
 | `vp.overlay(canvas or [canvases])` / `vp.overlayOff()` | full-page preview to screenshot |
 | `vp.zoomImage(I, R, scale)` | canvas of an enlarged image area |
 | `vp.renderShapes(panel, R, scale, rule, filter)` | canvas of the shapes as Vistaprint fills them (even-odd) |
+
+## Other products, foil templates, cleanup (0.1.0)
+
+| Call | Returns |
+|---|---|
+| `vp.artFromPanel(i)` | sets `vp.ART` to panel `i` (with bleed) in pt, returns it |
+| `vp.placeSvg(text, {trim, fullBleed, z, panel})` | shapes from an SVG drawn at trim size (`trim` in pt), centred in the bleed; `fullBleed` snaps edges on the trim line to the panel edges; fill or stroke read from each piece |
+| `vp.inject(shapes, panel)` | pushes the shapes in one command, returns their ids |
+| `vp.foilSpot()` | `{used, declared, fromTemplate}`: spot colours on foiled elements (shapes, text content, images) and the product's declared ones |
+| `vp.openFinishes()` | clicks the Finishes tab (or "Add finishes") |
+| `await vp.tickFoil(ids, {delay, passes, panel})` | ticks "Apply finish" for those shapes in the Finishes panel (checkbox = images first, then shapes in order), waits for the panel, reopens it when it closes, drives the loop from `overprints`; `{asked, foiled, missing, unexpected, log}` |
+| `vp.templateItems(keepIds)` | per side: images, text areas, shapes not in `keepIds`, item references |
+| `vp.removeTemplate(keepIds)` | deletes all of them on both sides in one command, logs the ids in `vp.log`; `{removed, left}` |
+| `await vp.saveNow()` | waits, clicks Save when pending, waits for "Saved" (use it instead of `vp.saved()` after a removal) |
+| `await vp.pixelCheck(svgTexts, {trim, k, foilColor, limit})` | draws the source SVGs and the shapes (foiled shapes in `foilColor`) at `k` px/pt over the trim area; `{px, any, over10, over64, pctOver10, maxd, ok}`; `ok` = under 0.5 % above 10 levels and under 0.1 % above 64 |
+
+Raised foil postcard reference: 43 shapes, `pctOver10` 0.114, 22 pixels above 64, at 4 px/pt.

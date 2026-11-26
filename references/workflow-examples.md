@@ -134,33 +134,23 @@ python scripts/svg_pieces.py background.svg bg_pieces.svg --rows   # 10 rows by 
 python scripts/svg_pieces.py gold.svg gold_pieces.svg              # 33 pieces
 ```
 ```js
-const MM = 72 / 25.4, panel = vp.panel(0);
-const W = parseFloat(panel.width) * MM, H = parseFloat(panel.height) * MM;
-vp.ART = { w: W, h: H };                       // not the business-card default
-const dx = (W - 432) / 2, dy = (H - 648) / 2;  // trim centred in the bleed
-// background: z from 1001, snap its outer edges (x = dx, x = dx + 432, y = dy + 648) to 0 / W / H
-// gold: z above the background, fill vp.hexToRgb('#cc8525'); keep their ids
-vp.exec(c => { for (const s of shapes) c.document.panels[0].shapes.push(s); });
-vp.check();                                    // ok: true
+const ids = vp.inject([
+  ...vp.placeSvg(files['bg_pieces.svg'],   { trim: { w: 432, h: 648 }, fullBleed: true, z: 1001 }),
+  ...vp.placeSvg(files['gold_pieces.svg'], { trim: { w: 432, h: 648 }, z: 1011 }),
+]);
+const goldIds = vp.panel(0).shapes.filter(s => s.color === 'rgb(204, 133, 37)').map(s => s.id);
+vp.check();                          // ok: true
+vp.foilSpot();                       // { used: ['spot(RaisedFoilGold)'], ... } from the template
+vp.openFinishes();
+await vp.tickFoil(goldIds);          // { asked: 33, foiled: 33, missing: [], unexpected: [] }
+vp.removeTemplate(ids);              // template images, text boxes, rectangles, references, both sides
+await vp.saveNow();                  // "Saved" (Save button clicked if needed)
+// reload, reinstall, then:
+vp.templateItems(ids);               // every list empty
+await vp.pixelCheck([files['background.svg'], files['gold.svg']], { trim: { w: 432, h: 648 } });
 ```
-Finishes panel (template unlocks it): checkbox `images.length + i` is shape `i`.
-```js
-const ready = async () => { for (let t = 0; t < 40; t++) { const c = document.querySelectorAll('input[type=checkbox][aria-label="Apply finish"]'); if (c.length >= expected) return [...c]; await new Promise(r => setTimeout(r, 500)); } };
-for (const i of goldIdx) { if (vp.panel(0).shapes.find(s => s.id === ids[i]).overprints) continue;
-  const cbs = await ready(); cbs[nImages + i].scrollIntoView({ block: 'center' });
-  cbs[nImages + i].click(); await new Promise(r => setTimeout(r, 1500)); }   // reopen the panel if it closed, rerun
-```
-Then delete the template, on both sides, and save for real:
-```js
-vp.exec(c => { for (const p of c.document.panels) { p.images.splice(0); p.textAreas.splice(0);
-  p.itemReferences && p.itemReferences.splice(0);
-  for (let k = p.shapes.length - 1; k >= 0; k--) if (!ids.includes(p.shapes[k].id)) p.shapes.splice(k, 1); } });
-// click the toolbar Save button, wait for "Saved to My Projects", reload (?workId=...), reinstall,
-// expect 0 images, 0 text, 43 shapes, 33 with overprints, vp.check().ok
-```
-Pixel check: draw both SVGs and the shapes at 4 px/pt on the trim area (viewBox in pt,
-position in mm). Result here: 0.11 % of pixels differ by more than 10 levels, max 95, all
-anti-aliased edges.
+Result here: 0.11 % of pixels differ by more than 10 levels, 22 pixels above 64, all on
+anti-aliased edges (`ok: true`).
 
 ## 7. Recolour to exact hex
 

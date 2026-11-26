@@ -4,7 +4,8 @@
  *
  * Installs window.__vp. Load it with the browser's JavaScript tool, either pasted as is or
  * read from the hidden file input: new Function(await file.text())().
- * Every function is synchronous except files(), image(), panelImage() and saved().
+ * Every function is synchronous except files(), image(), panelImage(), saved(), saveNow(),
+ * tickFoil() and pixelCheck().
  * Units: paths are in artboard points (vp.ART, default 259.92 x 151.92 pt = a business card
  * with bleed); Vistaprint places each shape in mm through viewBox -> position.
  * See references/toolkit-api.md for the full reference and worked examples.
@@ -13,7 +14,7 @@
   const RX = /[a-zA-Z]|[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g;
   const isL = (t) => /^[a-zA-Z]$/.test(t);
   const vp = (window.__vp = window.__vp || {});
-  vp.version = '0.0.2';
+  vp.version = '0.1.0';
   vp.ART = vp.ART || { w: 259.92, h: 151.92 };
   const HOSTS = /(^|\.)vistaprint\.[a-z]{2,3}(\.[a-z]{2})?$/i; // vistaprint.ca, .com, .co.uk, .com.au...: the toolkit only drives Vistaprint pages
 
@@ -46,6 +47,7 @@
     images: p.images.map((i) => ({ id: i.id, z: i.zIndex, pos: i.position })),
     shapes: p.shapes.map((s) => `${s.type} z${s.zIndex} ${s.color || '-'}${s.overprints ? ' ' + s.overprints.join(',') : ''}${s.stroke && s.stroke.thickness && !/^0(\.0*)?(pt|mm)$/.test(s.stroke.thickness) ? ' stroke ' + s.stroke.thickness : ''}`),
     textAreas: p.textAreas.length,
+    foiledText: p.textAreas.filter((t) => /spot\(/.test(JSON.stringify(t.content || ''))).length,
   }));
 
   // ------------------------------------------------------------------ paths
@@ -379,5 +381,89 @@
       const P = new Path2D(s.svgPathData.replace(/,/g, ' ')); if (s.color && !/cmyka/.test(s.color)) { g.fillStyle = s.color; g.fill(P, rule); } else if (s.overprints) { g.fillStyle = '#aaa'; g.fill(P, rule); }
       else { g.strokeStyle = s.stroke.color; g.lineWidth = Math.max(parseFloat(s.stroke.thickness) / (s.stroke.thickness.endsWith('mm') ? 0.352778 : 1), 0.1); g.stroke(P); } }
     return c; };
+  // ------------------------------------------------------------------ products other than business cards, foil templates
+  const PT = 72 / 25.4; // pt per mm
+  vp.artFromPanel = function (panelIndex = 0) { // artboard = the whole panel (with bleed), in pt
+    const p = vp.panel(panelIndex); vp.ART = { w: parseFloat(p.width) * PT, h: parseFloat(p.height) * PT }; return vp.ART; };
+  vp.placeSvg = function (text, opt = {}) { // SVG drawn at trim size -> shapes centred in the bleed
+    const panelIndex = opt.panel || 0, p = vp.panel(panelIndex); vp.artFromPanel(panelIndex);
+    const W = vp.ART.w, H = vp.ART.h, tw = opt.trim ? opt.trim.w : W, th = opt.trim ? opt.trim.h : H;
+    const dx = (W - tw) / 2, dy = (H - th) / 2, e = 0.01; let z = opt.z || 1001;
+    const snap = (d) => d.replace(/(-?\d+\.?\d*(?:e-?\d+)?),(-?\d+\.?\d*(?:e-?\d+)?)/g, (m, x, y) => { x = +x; y = +y;
+      if (Math.abs(x - dx) < e) x = 0; else if (Math.abs(x - (dx + tw)) < e) x = W;
+      if (Math.abs(y - dy) < e) y = 0; else if (Math.abs(y - (dy + th)) < e) y = H; return `${x},${y}`; });
+    return vp.parseSvg(text).map((pc) => { let d = vp.xform(pc.d, 1, 1, dx, dy); if (opt.fullBleed) d = snap(d);
+      const fill = (pc.attrs.fill || '').toLowerCase(), stroke = pc.attrs.stroke;
+      const style = fill && fill !== 'none' ? { fill: vp.hexToRgb(fill) } : { stroke: vp.hexToRgb(stroke), w: parseFloat(pc.attrs['stroke-width'] || '0.25') };
+      const s = vp.shape(d, z++, style, p); s._hex = fill; return s; });
+  };
+  vp.inject = function (shapes, panelIndex = 0) { const clean = shapes.map((s) => { const c = { ...s }; delete c._hex; return c; });
+    vp.exec((cimDoc) => { for (const s of clean) cimDoc.document.panels[panelIndex].shapes.push(s); }); return clean.map((s) => s.id); };
+  vp.foilSpot = function () { // spot colour used by the template's foiled elements, else the product's declared one
+    const d = vp.doc(), seen = new Set();
+    for (const p of d.document.panels) { for (const s of p.shapes) (s.overprints || []).forEach((o) => seen.add(o));
+      for (const t of p.textAreas) (JSON.stringify(t.content || '').match(/spot\([^)]*\)/g) || []).forEach((o) => seen.add(o));
+      for (const i of p.images) (i.overprints || []).forEach((o) => seen.add(o)); }
+    const declared = []; try { for (const v of d.metadata.studioHistoricalApplicationState.easelConfig.designViews || [])
+      for (const g of (v.spotColorSet || {}).spotColorGroups || []) for (const c of g.availableSpotColors || []) declared.push(`spot(${c.name})`); } catch (e) { /* no metadata */ }
+    return { used: [...seen], declared: [...new Set(declared)], fromTemplate: seen.size > 0 };
+  };
+  const FIN = 'input[type=checkbox][aria-label="Apply finish"]';
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  vp.openFinishes = function () { const el = [...document.querySelectorAll('[role=tab],button')].find((b) => /^(Finishes|Add finishes)$/i.test((b.getAttribute('aria-label') || b.textContent || '').trim()));
+    if (!el) throw new Error('Finishes tab not found'); el.click(); return 'Finishes opened'; };
+  vp.tickFoil = async function (ids, opt = {}) { // tick "Apply finish" for these shape ids through the Finishes panel
+    const panelIndex = opt.panel || 0, delay = opt.delay || 1500, log = [];
+    const want = (id) => { const s = vp.panel(panelIndex).shapes.find((x) => x.id === id); return s && !s.overprints; };
+    const ready = async () => { for (let t = 0; t < 40; t++) { const p = vp.panel(panelIndex), n = p.images.length + p.shapes.length, c = document.querySelectorAll(FIN);
+      if (c.length >= n) return [...c]; if (c.length === 0 && t % 10 === 5) { try { vp.openFinishes(); } catch (e) { /* retry */ } } await sleep(500); } return null; };
+    for (let pass = 0; pass < (opt.passes || 4); pass++) {
+      const todo = ids.filter(want); if (!todo.length) break;
+      for (const id of todo) { if (!want(id)) continue; const cbs = await ready(); if (!cbs) { log.push('panel not ready'); break; }
+        const p = vp.panel(panelIndex), k = p.images.length + p.shapes.findIndex((s) => s.id === id), cb = cbs[k];
+        if (!cb) { log.push(`no checkbox for ${id}`); continue; } if (cb.checked) { log.push(`checked but no overprint: ${id}`); continue; }
+        cb.scrollIntoView({ block: 'center' }); await sleep(300); cb.click(); await sleep(delay); } }
+    const p = vp.panel(panelIndex), done = ids.filter((id) => { const s = p.shapes.find((x) => x.id === id); return s && s.overprints; });
+    const wrong = p.shapes.filter((s) => s.overprints && !ids.includes(s.id)).map((s) => s.id);
+    return { asked: ids.length, foiled: done.length, missing: ids.filter((id) => !done.includes(id)), unexpected: wrong, log };
+  };
+  vp.templateItems = function (keepIds) { // everything on every side that is not one of keepIds
+    return vp.doc().document.panels.map((p, i) => ({ panel: i, side: p.name,
+      images: p.images.map((x) => x.id), textAreas: p.textAreas.map((x) => x.id),
+      shapes: p.shapes.filter((s) => !keepIds.includes(s.id)).map((s) => `${s.id} ${s.type} z${s.zIndex}`),
+      itemReferences: (p.itemReferences || []).map((x) => x.id), subpanels: (p.subpanels || []).length })); };
+  vp.removeTemplate = function (keepIds) { // delete every template element (text boxes, background, lines, rectangles, references) on both sides
+    const before = vp.templateItems(keepIds);
+    vp.exec((cimDoc) => { for (const p of cimDoc.document.panels) { p.images.splice(0); p.textAreas.splice(0);
+      if (p.itemReferences) p.itemReferences.splice(0); if (p.subpanels) p.subpanels.splice(0);
+      for (let k = p.shapes.length - 1; k >= 0; k--) if (!keepIds.includes(p.shapes[k].id)) p.shapes.splice(k, 1); } });
+    const entry = { at: new Date().toISOString(), event: 'template removed', removed: before }; vp.log.push(entry);
+    return { removed: before.map((b) => ({ side: b.side, images: b.images.length, textAreas: b.textAreas.length, shapes: b.shapes.length, itemReferences: b.itemReferences.length })), left: vp.templateItems(keepIds) };
+  };
+  vp.saveNow = async function (timeoutMs = 30000) { // click Save and wait for "Saved"; vp.saved() alone can answer before the autosave starts
+    const t0 = Date.now(); await sleep(1500);
+    const btn = () => [...document.querySelectorAll('button')].find((x) => /^(Saved|Saving|Save)\b/i.test((x.getAttribute('aria-label') || x.textContent || '').trim()));
+    let b = btn(); if (b && vp.saveState() === 'Save') b.click();
+    while (Date.now() - t0 < timeoutMs) { await sleep(1000); if (vp.saveState() === 'Saved') return 'Saved'; b = btn(); if (b && vp.saveState() === 'Save') b.click(); }
+    return vp.saveState();
+  };
+  vp.pixelCheck = async function (svgTexts, opt = {}) { // source SVGs vs shapes, drawn on the trim area
+    const panelIndex = opt.panel || 0, p = vp.panel(panelIndex), k = opt.k || 4; vp.artFromPanel(panelIndex);
+    const tw = opt.trim ? opt.trim.w : vp.ART.w, th = opt.trim ? opt.trim.h : vp.ART.h, dx = (vp.ART.w - tw) / 2, dy = (vp.ART.h - th) / 2;
+    const cw = Math.round(tw * k), ch = Math.round(th * k);
+    const mk = () => { const c = document.createElement('canvas'); c.width = cw; c.height = ch; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cw, ch); return g; };
+    const ga = mk(); for (const t of [].concat(svgTexts)) { const img = new Image(); const url = URL.createObjectURL(new Blob([t], { type: 'image/svg+xml' }));
+      await new Promise((r, e) => { img.onload = r; img.onerror = e; img.src = url; }); ga.drawImage(img, 0, 0, cw, ch); URL.revokeObjectURL(url); }
+    const gb = mk(); const foilHex = opt.foilHex || {};
+    for (const s of [...p.shapes].sort((a, b) => a.zIndex - b.zIndex)) { if (s.type !== 'curve') continue; const vb = s.viewBox, pos = s.position; // viewBox = path units (pt), position = mm
+      gb.setTransform(k, 0, 0, k, -dx * k, -dy * k); gb.translate(parseFloat(pos.x) * PT, parseFloat(pos.y) * PT);
+      gb.scale(parseFloat(pos.width) * PT / parseFloat(vb.width), parseFloat(pos.height) * PT / parseFloat(vb.height)); gb.translate(-parseFloat(vb.x), -parseFloat(vb.y));
+      gb.fillStyle = s.overprints ? (foilHex[s.id] || opt.foilColor || '#cc8525') : (s.color && !/cmyka/.test(s.color) ? s.color : '#f0f');
+      gb.fill(new Path2D(vp.norm(s.svgPathData.replace(/,/g, ' '))), 'evenodd'); }
+    const a = ga.getImageData(0, 0, cw, ch).data, b = gb.getImageData(0, 0, cw, ch).data; let any = 0, over10 = 0, over64 = 0, maxd = 0;
+    for (let i = 0; i < a.length; i += 4) { const x = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]));
+      if (x) any++; if (x > 10) over10++; if (x > 64) over64++; if (x > maxd) maxd = x; }
+    const n = cw * ch; return { px: n, any, over10, over64, pctOver10: +(100 * over10 / n).toFixed(4), pctOver64: +(100 * over64 / n).toFixed(5), maxd, ok: 100 * over10 / n < (opt.limit || 0.5) && over64 / n < 0.001 };
+  };
   return `vp_toolkit ${vp.version} installed (window.__vp)`;
 })();

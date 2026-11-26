@@ -22,3 +22,8 @@
 | 18 | Optimiser drifts to a wrong scale (e.g. 13.8 pt for 14 pt text) | Poor seed or a neighbour in the fit region | Seed the size from a flat cap height (N, E, H), anchor on the first glyph, keep regions tight |
 | 19 | Bands or pieces overlap in a different order than in the SVG | Designer reordered them | Check which colour shows in the overlap zone of the image; set zIndex accordingly |
 | 20 | Weight test says "lighter than 900" | Overlaps counted twice, or the implicit-lineto bug | Clean both sides; re-check outlines before concluding |
+| 21 | No per-shape foil ticks, only "Text only / Image only / Text and images" | Blank raised foil postcard | The user opens a raised foil template by hand; then the per-element panel appears |
+| 22 | Finishes panel closes or empties after a few ticks | It reloads itself after document changes | `vp.tickFoil`: wait for every checkbox, scroll, click, re-read `overprints`, reopen the panel |
+| 23 | Template elements come back after a reload | `vp.saved()` answered "Saved" before the autosave started | `vp.saveNow()` (clicks Save), reload, `vp.templateItems(ids)` |
+| 24 | Pixel check against the SVG is wildly off | Shape `viewBox` is in path units (pt) although labelled "mm" | Scale = position (mm to pt) / viewBox; `vp.pixelCheck` does it |
+| 25 | A template text box disappears while ticking | Seen once while the panel was reloading | Template content is deleted anyway; never rely on template elements after step J |
