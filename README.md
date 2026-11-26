@@ -13,9 +13,10 @@ and eligible for **raised foil** (silver or gold) on business cards.
 
 ## The problem
 
-Vistaprint states that raised foil is not available on fully uploaded custom designs: in
-the Studio, the Finishes panel only offers foil on **editor elements** (text and shapes),
-never on an uploaded image. Upload your logo as a PNG and you cannot foil it; upload it at
+Vistaprint's [raised foil FAQ](https://www.vistaprint.com/business-cards/raised-foil) says
+you cannot upload your own design and add raised foil to it: raised foil comes on its
+pre-designed templates only. In the Studio, the Finishes panel offers foil on **editor
+elements** (text and shapes), never on an uploaded image. Upload your logo as a PNG and you cannot foil it; upload it at
 72 ppi and your business card prints blurry.
 
 Redrawing a logo by hand in the Studio is not realistic, and the Studio has no "import SVG
@@ -166,7 +167,7 @@ Never. It edits the design in your own session, and the cart, checkout and payme
 with you. Review the proof before ordering.
 
 **Is foil good on very small text?**
-Vistaprint recommends about 12-13 pt and up for foil. Fine lines and small text can be
+Vistaprint asks for text of 13 pt or larger for raised foil. Fine lines and small text can be
 vectorized for sharpness but are better left without foil.
 
 ## Repository layout

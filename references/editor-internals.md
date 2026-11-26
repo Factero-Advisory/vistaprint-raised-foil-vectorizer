@@ -78,8 +78,8 @@ read back as the hex the user typed. Inject `rgb(r, g, b)` (`vp.hexToRgb`).
   `spot(RaisedFoilGold)`) and removes `color` from that shape.
 - Foil applies to the front only on business cards; the panel shows the price impact
   ("at no extra cost" observed for silver on a Raised Foil product).
-- Vistaprint advises foil on elements of about 12-13 pt and larger; hairlines may not foil
-  well.
+- Vistaprint's raised foil product page asks for text of 13 pt or larger; hairlines may not
+  foil well.
 - Do it through the UI (Finishes -> tick the thumbnails). The thumbnail grid shifts once
   the warning banner disappears after the first tick: re-read the checkbox states
   (`input[type=checkbox]` with `aria-label="Apply finish"`) instead of trusting positions.
