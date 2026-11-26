@@ -129,6 +129,26 @@ Writing `overprints` directly with `vp.exec` on a blank postcard also renders as
 the Studio, but it bypasses the panel; use it only if the user asks, after the template
 method fails.
 
+## 5b. Specs, bleed, cut and the review mockup
+
+- Each template carries its own sizes in
+  `metadata.studioHistoricalApplicationState.easelConfig.designViews[i].docAdditionalData.masks`
+  (`pathType` BLEED, TRIM, SAFE; coordinates in **cm**). Raised foil postcard 6 x 9:
+  bleed 158 x 234 mm, trim 152 x 228 mm at (3, 3), safe 146 x 222 mm at (6, 6), the same
+  values as the product's "Specs & Templates". Read them on every template (`vp.specs()`).
+- The trim of a "6 x 9 in" postcard is 152 x 228 mm, not 152.4 x 228.6: artwork drawn at
+  6 x 9 in goes on the trim at x0.997375.
+- Vistaprint's printing guide: because of mechanical tolerances the cut can land anywhere
+  from the bleed area to the safe margin. A block edge anywhere in that band, or a few mm
+  inside the trim, shows as a sliver of variable width.
+- "Next" opens "Review your design": a WebGL mockup of the trimmed card (Front / Back,
+  "Drag to rotate"), with the checkbox "I have reviewed and approve my design", "Continue"
+  and "Edit my design". The canvas cannot be read by script (empty drawing buffer): measure
+  it from a zoomed screenshot (`computer zoom` with `save_to_disk`, then Python). The card
+  edges show a 1 to 3 px shading band and the 3D lighting adds a gradient near the bottom:
+  confirm any short last segment by eye before calling it a sliver. Leave with "Edit my
+  design"; never tick the checkbox, never click Continue.
+
 ## 6. Saving
 
 - Autosave runs after changes; the toolbar button's accessible name is "Saved" when done

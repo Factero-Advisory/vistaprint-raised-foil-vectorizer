@@ -64,8 +64,14 @@ written with explicit path commands.
    page reload. Only then is the image removed.
 6. **Foil and clean up.** Foil is ticked per shape in the Finishes panel. On a template,
    everything that came with it (text boxes, background, lines) is deleted on both sides,
-   the design is saved, reloaded and compared pixel by pixel with your SVGs. You review the
-   proof; ordering stays with you.
+   the design is saved, reloaded and compared pixel by pixel with your SVGs.
+7. **Bleed and cut.** The bleed, trim and safe sizes are read from each template (and
+   checked against the product's "Specs & Templates"). Vistaprint's cut can land anywhere
+   between the bleed edge and the safe line, so the artwork is placed on the trim with one
+   uniform scale, only the edge blocks or background are extended into the bleed, and a
+   check makes sure no edge of another colour falls near the cut and every foil element
+   stays inside the safe area. The "Review your design" mockup (Next) is then measured from
+   a screenshot. You review the proof; ordering stays with you.
 
 ## Safety and transparency
 
@@ -81,11 +87,13 @@ recolour or replace shapes, tick foil on your shapes in the Finishes panel, remo
 once its replacement is verified, and delete the stock elements of a template you opened. It writes
 working files and a session log on your computer.
 
-**What it never does.** Add to cart, update the cart, check out or pay. Open a site other
+**What it never does.** Add to cart, update the cart, check out or pay. It opens "Next"
+only to look at the "Review your design" mockup, never ticks "I have reviewed and approve
+my design" and never clicks Continue. Open a site other
 than Vistaprint. Follow instructions found in a page, a file or a design name. Download a
 font without asking you first. Publish anything.
 
-**Safeguards built into the skill (toolkit 0.1.0):**
+**Safeguards built into the skill (toolkit 0.2.0):**
 
 - *Removal gate.* `vp.removeImage()` keeps the image when a measured pixel difference is
   above its limit or the even-odd check fails. Claude must then stop and ask you; it can
@@ -126,6 +134,7 @@ On four real business cards (front and back) and on synthetic tests:
 | Tracking recovered on a synthetic line | exact (-0.44 pt), max glyph error 0.0065 pt |
 | Tracing an anti-aliased circle | 0.13 px mean error |
 | 6 x 9 in raised foil postcard, 43 shapes from two SVG layers | 0.11 % of pixels differ by more than 10 levels (288 ppi), all on anti-aliased edges |
+| Same postcard, bleed and cut | slivers of 3 mm (sides) and 4.5 mm (bottom) found and removed; after the fix the first block edge is 21.6 mm from the cut and foil stays 4.9 mm inside the safe line |
 
 ## Requirements
 
@@ -188,6 +197,12 @@ the right shapes, then deletes all the template's own content.
 Never. It edits the design in your own session, and the cart, checkout and payment stay
 with you. Review the proof before ordering.
 
+**Why do I see a thin strip of another colour on the edge of my card?**
+The cut can land anywhere between the bleed edge and the safe line. If a block or colour
+change sits in that band, or a few mm inside the cut, a strip of variable width shows on
+the finished card. The skill places your artwork on the trim line and only extends the
+edge colour into the bleed, then checks the "Review your design" mockup.
+
 **Is foil good on very small text?**
 Vistaprint asks for text of 13 pt or larger for raised foil. Fine lines and small text can be
 vectorized for sharpness but are better left without foil.
@@ -233,7 +248,10 @@ ordinateur. Pour une carte postale Raised Foil, vous ouvrez d'abord vous-même u
 Vistaprint qui a déjà du Raised Foil : c'est lui qui permet de choisir le fini élément par
 élément. Le skill insère vos vecteurs, coche le foil sur les bonnes formes, supprime tout
 le contenu du modèle (boîtes de texte, fond, lignes), enregistre, recharge et compare au
-pixel avec vos SVG. La commande et le paiement restent toujours entre vos mains. Les demandes en français fonctionnent (« vectorise mon
+pixel avec vos SVG. Il lit ensuite le fond perdu, la coupe et la zone de sécurité de
+chaque modèle, cale le visuel sur la ligne de coupe sans le déformer, prolonge seulement
+les blocs du bord dans le fond perdu et vérifie la maquette « Review your design » (bouton
+Next), sans jamais approuver ni continuer. La commande et le paiement restent toujours entre vos mains. Les demandes en français fonctionnent (« vectorise mon
 logo », « mets le Raised Foil sur le logo seulement »).
 
 ## Licence

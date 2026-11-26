@@ -14,7 +14,7 @@
   const RX = /[a-zA-Z]|[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g;
   const isL = (t) => /^[a-zA-Z]$/.test(t);
   const vp = (window.__vp = window.__vp || {});
-  vp.version = '0.1.0';
+  vp.version = '0.2.0';
   vp.ART = vp.ART || { w: 259.92, h: 151.92 };
   const HOSTS = /(^|\.)vistaprint\.[a-z]{2,3}(\.[a-z]{2})?$/i; // vistaprint.ca, .com, .co.uk, .com.au...: the toolkit only drives Vistaprint pages
 
@@ -465,5 +465,52 @@
       if (x) any++; if (x > 10) over10++; if (x > 64) over64++; if (x > maxd) maxd = x; }
     const n = cw * ch; return { px: n, any, over10, over64, pctOver10: +(100 * over10 / n).toFixed(4), pctOver64: +(100 * over64 / n).toFixed(5), maxd, ok: 100 * over10 / n < (opt.limit || 0.5) && over64 / n < 0.001 };
   };
+  // ------------------------------------------------------------------ specs per template, cut plan, cut check (0.2.0)
+  vp.specs = function () { // bleed / trim / safe of every side, read from the template that is open (never reuse another product's)
+    const views = (((vp.doc().metadata || {}).studioHistoricalApplicationState || {}).easelConfig || {}).designViews || [];
+    return vp.doc().document.panels.map((p, i) => { const v = views.find((x) => x.id === p.id) || views[i] || {}; const out = { side: p.name, panel: { w: parseFloat(p.width), h: parseFloat(p.height) } };
+      for (const m of ((v.docAdditionalData || {}).masks || [])) { const xs = [], ys = [];
+        for (const q of m.paths || []) { xs.push(q.anchorX); ys.push(q.anchorY); for (const pt of q.pathPoints || []) { xs.push(pt.endPointX); ys.push(pt.endPointY); } }
+        const r = (a) => +(a * 10).toFixed(3); out[m.pathType.toLowerCase()] = { x: r(Math.min(...xs)), y: r(Math.min(...ys)), w: r(Math.max(...xs) - Math.min(...xs)), h: r(Math.max(...ys) - Math.min(...ys)) }; } // cm -> mm
+      return out; }); };
+  vp.specsMatch = function (published, panelIndex = 0) { // published = {bleed:{w,h}, trim:{w,h}, safe:{w,h}} in mm, typed from Specs & Templates
+    const sp = vp.specs()[panelIndex], bad = [];
+    for (const k of ['bleed', 'trim', 'safe']) { if (!published[k] || !sp[k]) { bad.push(`${k}: missing`); continue; }
+      for (const d of ['w', 'h']) if (Math.abs(published[k][d] - sp[k][d]) > 0.5) bad.push(`${k}.${d}: Specs ${published[k][d]} mm, document ${sp[k][d]} mm`); }
+    return { ok: !bad.length, bad, document: sp }; };
+  vp.cutPlan = function (art, panelIndex = 0) { // art = {w, h} of the source artwork in pt; uniform scale onto the trim box
+    const sp = vp.specs()[panelIndex], t = sp.trim, MMp = 72 / 25.4, tw = t.w * MMp, th = t.h * MMp;
+    const sw = tw / art.w, sh = th / art.h, s = Math.min(sw, sh);
+    return { s, ox: t.x * MMp + (tw - art.w * s) / 2, oy: t.y * MMp + (th - art.h * s) / 2, aspectError: +((Math.max(sw, sh) / s - 1) * 100).toFixed(3),
+      note: 'Scale the artwork by s at (ox, oy) in pt; extend only the edge blocks into the bleed with their own colour; add no new blocks; then vp.cutCheck().' }; };
+  vp.cutCheck = function (opt = {}) { // after the cut can land anywhere between bleed and safe: no colour change there, foil and text inside safe
+    const panelIndex = opt.panel || 0, sp = vp.specs()[panelIndex], p = vp.panel(panelIndex), k = opt.k || 8, PTm = 72 / 25.4; // k px per mm
+    const W = Math.round(sp.panel.w * k), H = Math.round(sp.panel.h * k); const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H);
+    const isContent = (s) => !!s.overprints || (opt.important || []).includes(s.id); // content is checked against safe; background against the cut
+    for (const s of [...p.shapes].sort((a, b) => a.zIndex - b.zIndex)) { if (s.type !== 'curve' || isContent(s)) continue; const vb = s.viewBox, pos = s.position;
+      g.setTransform(k, 0, 0, k, 0, 0); g.translate(parseFloat(pos.x), parseFloat(pos.y)); g.scale(parseFloat(pos.width) / parseFloat(vb.width), parseFloat(pos.height) / parseFloat(vb.height)); g.translate(-parseFloat(vb.x), -parseFloat(vb.y));
+      g.fillStyle = s.overprints ? (opt.foilColor || '#cc8525') : (s.color && !/cmyka/.test(s.color) ? s.color : '#ff00ff'); g.fill(new Path2D(vp.norm(s.svgPathData.replace(/,/g, ' '))), 'evenodd'); }
+    const D = g.getImageData(0, 0, W, H).data, at = (x, y) => { const i = 4 * (y * W + x); return [D[i], D[i + 1], D[i + 2]]; };
+    const far = (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2])) > (opt.tol || 6);
+    const safe = sp.safe, trim = sp.trim, minStrip = opt.minStripMm || 8, depth = Math.round((opt.depthMm || 40) * k);
+    // For every line perpendicular to an edge: first colour change going inward from the bleed edge.
+    // Fail if it lies in the cut zone (bleed edge to safe line) or closer than minStrip to the trim line (a sliver of another block).
+    const scan = (edge) => { let changesInCutZone = 0, slivers = 0, narrowest = Infinity; const step = Math.max(1, Math.round(k / 2));
+      const horiz = edge === 'left' || edge === 'right'; const t0 = horiz ? Math.round(safe.y * k) : Math.round(safe.x * k), t1 = horiz ? Math.round((safe.y + safe.h) * k) : Math.round((safe.x + safe.w) * k);
+      const trimOff = (edge === 'left' ? trim.x : edge === 'top' ? trim.y : edge === 'right' ? sp.panel.w - trim.x - trim.w : sp.panel.h - trim.y - trim.h);
+      const safeOff = (edge === 'left' ? safe.x : edge === 'top' ? safe.y : edge === 'right' ? sp.panel.w - safe.x - safe.w : sp.panel.h - safe.y - safe.h);
+      for (let u = t0; u < t1; u += step) { const px = (i) => edge === 'left' ? at(i, u) : edge === 'right' ? at(W - 1 - i, u) : edge === 'top' ? at(u, i) : at(u, H - 1 - i);
+        const ref = px(0); let j = -1; for (let i = 1; i < depth; i++) if (far(px(i), ref)) { j = i; break; } if (j < 0) continue;
+        const mm = j / k; if (mm < safeOff - 0.05) changesInCutZone++; const strip = mm - trimOff; if (strip < minStrip) slivers++; narrowest = Math.min(narrowest, strip); }
+      return { changesInCutZone, slivers, narrowestStripFromTrimMm: narrowest === Infinity ? null : +narrowest.toFixed(2) }; };
+    const edges = { left: scan('left'), right: scan('right'), top: scan('top'), bottom: scan('bottom') };
+    const keep = (s) => s.overprints || (opt.important || []).includes(s.id); const out = [];
+    for (const s of p.shapes.filter(keep)) { const x0 = parseFloat(s.position.x), y0 = parseFloat(s.position.y), x1 = x0 + parseFloat(s.position.width), y1 = y0 + parseFloat(s.position.height);
+      if (x0 < safe.x || y0 < safe.y || x1 > safe.x + safe.w || y1 > safe.y + safe.h) out.push(s.id); }
+    let minMargin = Infinity; for (const s of p.shapes.filter(keep)) { const x0 = parseFloat(s.position.x), y0 = parseFloat(s.position.y), x1 = x0 + parseFloat(s.position.width), y1 = y0 + parseFloat(s.position.height);
+      minMargin = Math.min(minMargin, x0 - safe.x, y0 - safe.y, safe.x + safe.w - x1, safe.y + safe.h - y1); }
+    const ok = Object.values(edges).every((e) => e.changesInCutZone === 0 && e.slivers === 0) && !out.length;
+    return { ok, specs: sp, edges, outsideSafe: out, minMarginInsideSafeMm: +minMargin.toFixed(2) }; };
   return `vp_toolkit ${vp.version} installed (window.__vp)`;
 })();

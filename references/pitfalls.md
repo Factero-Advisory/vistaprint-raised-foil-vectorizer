@@ -27,3 +27,7 @@
 | 23 | Template elements come back after a reload | `vp.saved()` answered "Saved" before the autosave started | `vp.saveNow()` (clicks Save), reload, `vp.templateItems(ids)` |
 | 24 | Pixel check against the SVG is wildly off | Shape `viewBox` is in path units (pt) although labelled "mm" | Scale = position (mm to pt) / viewBox; `vp.pixelCheck` does it |
 | 25 | A template text box disappears while ticking | Seen once while the panel was reloading | Template content is deleted anyway; never rely on template elements after step J |
+| 26 | Thin band of another colour along the cut edge in the review mockup | Artwork fitted to the safe area and blocks added to fill the bleed: block edges fall in the cut zone | Fit on the trim with `vp.cutPlan`, extend only the edge blocks, `vp.cutCheck()` |
+| 27 | `vp.cutCheck()` passes while the mockup shows slivers | Colour tolerance too wide (two greens differ by about 20) or only the cut zone scanned | Toolkit 0.2.0: `tol` 6 and the 8 mm strip rule from the trim |
+| 28 | Review mockup cannot be read by script | WebGL canvas without a preserved drawing buffer | Zoomed screenshot saved to disk, measured in Python |
+| 29 | Sizes from one template reused on another | Each product and template has its own bleed, trim and safe | `vp.specs()` on every template, `vp.specsMatch()` against Specs & Templates |

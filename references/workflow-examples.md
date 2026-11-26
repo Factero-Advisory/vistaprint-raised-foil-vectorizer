@@ -152,6 +152,22 @@ await vp.pixelCheck([files['background.svg'], files['gold.svg']], { trim: { w: 4
 Result here: 0.11 % of pixels differ by more than 10 levels, 22 pixels above 64, all on
 anti-aliased edges (`ok: true`).
 
+Bleed and cut (step L), on the same card:
+```js
+vp.specs()[0];                       // bleed 158 x 234, trim 152 x 228 at (3, 3), safe 146 x 222 at (6, 6)
+vp.specsMatch({ bleed: { w: 158, h: 234 }, trim: { w: 152, h: 228 }, safe: { w: 146, h: 222 } }); // from Specs & Templates
+vp.cutCheck();                       // first layout (fit to safe + added blocks): slivers 3 mm left/right, 4.5 mm bottom
+const { s, ox, oy } = vp.cutPlan({ w: 432, h: 648 });   // s = 0.997375, ox = oy = 8.504 pt (the trim corner)
+// gold: vp.geometry(vp.xform(piece.d, s, s, ox, oy), panel) on each foiled shape (keeps overprints)
+// background: 7 x 5 blocks of 61.714 x 64.8 pt times s; column 0 starts at x = 0, column 6 ends at the panel
+// width, the last row ends at the panel height; no extra blocks
+vp.cutCheck();                       // ok: first block edge 21.6 mm from the trim, foil >= 4.9 mm inside safe
+await vp.saveNow();
+```
+Then Next -> "Review your design": zoom on the card, save the capture, measure in Python:
+7 columns of 20.4 to 22.4 mm (21.7 expected, about 1 mm per pixel of error), 5 rows, no
+sliver; leave with "Edit my design".
+
 ## 7. Recolour to exact hex
 
 ```js

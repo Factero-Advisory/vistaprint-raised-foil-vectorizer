@@ -1,4 +1,4 @@
-# vp_toolkit.js API (version 0.1.0)
+# vp_toolkit.js API (version 0.2.0)
 
 Install in the page (see SKILL.md section 2); everything lives on `window.__vp`.
 Units: artboard points unless stated. `I` = image object from `vp.image()` /
@@ -88,3 +88,16 @@ Units: artboard points unless stated. `I` = image object from `vp.image()` /
 | `await vp.pixelCheck(svgTexts, {trim, k, foilColor, limit})` | draws the source SVGs and the shapes (foiled shapes in `foilColor`) at `k` px/pt over the trim area; `{px, any, over10, over64, pctOver10, maxd, ok}`; `ok` = under 0.5 % above 10 levels and under 0.1 % above 64 |
 
 Raised foil postcard reference: 43 shapes, `pctOver10` 0.114, 22 pixels above 64, at 4 px/pt.
+
+## Specs per template, bleed and cut (0.2.0)
+
+| Call | Returns |
+|---|---|
+| `vp.specs()` | per side, in mm: `panel`, `bleed`, `trim`, `safe` rectangles read from the masks of the template that is open |
+| `vp.specsMatch({bleed, trim, safe})` | compares sizes typed from the product's "Specs & Templates" with the document (0.5 mm tolerance); `{ok, bad[], document}` |
+| `vp.cutPlan({w, h})` | uniform scale and offset (pt) that put artwork of that size on the trim box; `aspectError` (%) if the shapes differ |
+| `vp.cutCheck({k, minStripMm, tol, important, foilColor})` | background shapes only: first colour change from each bleed edge must not be in the cut zone nor closer than `minStripMm` (8) to the trim; foiled and `important` shapes must be inside safe; `{ok, specs, edges{left,right,top,bottom}, outsideSafe[], minMarginInsideSafeMm}`. `tol` (6) is the colour difference that counts: two close greens differ by about 20 |
+
+Postcard reference: before the fix, slivers of 3 mm (sides) and 4.5 mm (bottom); after
+`cutPlan` (x0.997375 on the trim) and edge blocks extended, no sliver, first block edge
+21.6 mm from the trim, foil at least 4.9 mm inside safe.
