@@ -1,4 +1,4 @@
-# vp_toolkit.js API (version 0.0.1)
+# vp_toolkit.js API (version 0.0.2)
 
 Install in the page (see SKILL.md section 2); everything lives on `window.__vp`.
 Units: artboard points unless stated. `I` = image object from `vp.image()` /
@@ -9,7 +9,7 @@ Units: artboard points unless stated. `I` = image object from `vp.image()` /
 
 | Call | Returns |
 |---|---|
-| `vp.engine()` | design engine (cached; throws if the Studio is not loaded) |
+| `vp.engine()` | design engine (cached; throws if the Studio is not loaded or the page is not on a Vistaprint domain) |
 | `vp.doc()` | cimDoc JSON |
 | `vp.panel(i)` | panel `i` (0 = front, 1 = back) |
 | `vp.exec(cimDoc => {...})` | runs a mutation through the editor's command API (undoable, autosaved) |
@@ -60,6 +60,10 @@ Units: artboard points unless stated. `I` = image object from `vp.image()` /
 | Call | Returns |
 |---|---|
 | `vp.check()` | `{evenOddMismatch[], strayMoves[], ok}` for every curve of both sides |
+| `vp.LIMITS` | maximum % pixel difference per kind: `svg` 1, `piece` 3, `bold` 4, `light` 11, `trace` 1, `line` null (no benchmark: the user decides) |
+| `vp.gate(evidence)` | `{ok, failures[]}`; `evidence` = `[{name, kind, diff}]`, `diff` = a `vp.diff()` result; also fails when `vp.check()` fails |
+| `vp.removeImage(panel, imageId, evidence, {userApproved})` | the only way to remove an image: runs `vp.gate`, throws "STOP, image kept" on any failure; `userApproved` = the user's own words from the chat, only after they said so; returns the log entry |
+| `vp.log` | removals and refusals of this page load, with time, evidence and approval (copy it to the session log) |
 | `vp.fixStrayLines()` | count of outline-only lines repaired ("M a b M" -> "M a b L") |
 | `vp.candidates(sources)` / `vp.match(cands, d)` | matching of a path to clean sources (`{c, sc, dx, dy, res, d}`) |
 | `vp.repair(sources, apply)` | report lines; rebuilds matching shapes from clean glyphs when `apply` |

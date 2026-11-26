@@ -84,7 +84,10 @@ vp.exec(doc => doc.document.panels[1].shapes.push(...shapes));
 // zoom on screen: no original colour may show around the magenta
 vp.exec(doc => { for (const s of doc.document.panels[1].shapes) { const p = plan[shapes.findIndex(x => x.id === s.id)]; if (p) { s.color = p.fill; s.stroke.color = p.fill; } } });
 vp.check();                                                            // ok: true
-vp.exec(doc => { const imgs = doc.document.panels[1].images; imgs.splice(imgs.findIndex(i => i.id === I.id), 1); });
+vp.removeImage(1, I.id, [ { name: 'light text', kind: 'light', diff: L0.diff },
+                          { name: 'orange band', kind: 'piece', diff: f.diff } ]);
+// throws "STOP, image kept" if a difference is above vp.LIMITS or vp.check() fails:
+// show the message to the user and wait for their answer
 await vp.saved();                                                      // "Saved"
 ```
 Then reload the page, reinstall the toolkit, `vp.summary()`, `vp.check()`.

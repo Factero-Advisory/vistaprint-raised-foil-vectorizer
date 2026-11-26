@@ -13,11 +13,13 @@
   const RX = /[a-zA-Z]|[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g;
   const isL = (t) => /^[a-zA-Z]$/.test(t);
   const vp = (window.__vp = window.__vp || {});
-  vp.version = '0.0.1';
+  vp.version = '0.0.2';
   vp.ART = vp.ART || { w: 259.92, h: 151.92 };
+  const HOSTS = /(^|\.)vistaprint\.[a-z]{2,3}(\.[a-z]{2})?$/i; // vistaprint.ca, .com, .co.uk, .com.au...: the toolkit only drives Vistaprint pages
 
   // ------------------------------------------------------------------ editor engine
   vp.engine = function () {
+    if (!HOSTS.test(location.hostname)) throw new Error(`vp_toolkit only drives Vistaprint pages, not "${location.hostname}".`);
     if (vp._de && vp._de.cimDocStore) return vp._de;
     const root = [...document.querySelectorAll('body *')].find((e) => Object.keys(e).some((k) => k.startsWith('__reactContainer')));
     if (!root) throw new Error('React root not found: is the Studio page loaded?');
@@ -279,6 +281,44 @@
       if (nz !== eo) out.evenOddMismatch.push(`${p.name} z${s.zIndex}: ${((100 * (nz - eo)) / nz).toFixed(2)} %`);
     }));
     out.ok = !out.evenOddMismatch.length && !out.strayMoves.length; return out;
+  };
+
+  // ------------------------------------------------------------------ safety gate
+  // An image is removed only through vp.removeImage. It refuses when a measured difference is
+  // above the limit of its kind (SKILL.md section 5) or when vp.check() fails: the agent then
+  // stops and asks the user. Every removal and refusal is kept in vp.log for the session log.
+  vp.LIMITS = { svg: 1, piece: 3, bold: 4, light: 11, trace: 1, line: null }; // max % pixel difference; null = no benchmark, the user decides
+  vp.log = vp.log || [];
+  const pctOf = (x) => (typeof x === 'number' ? x : x && typeof x.pct === 'number' ? x.pct : NaN);
+  vp.gate = function (evidence) { // evidence: [{name, kind, diff}] with diff = a vp.diff() result (or its pct)
+    const failures = [];
+    if (!Array.isArray(evidence) || !evidence.length) failures.push('no evidence: measure every replacement element with vp.diff() first');
+    for (const e of Array.isArray(evidence) ? evidence : []) {
+      const name = (e && e.name) || '?'; const kind = e && e.kind; const pct = pctOf(e && e.diff);
+      if (!Object.prototype.hasOwnProperty.call(vp.LIMITS, kind)) failures.push(`${name}: unknown kind "${kind}" (use ${Object.keys(vp.LIMITS).join(', ')})`);
+      else if (vp.LIMITS[kind] === null) failures.push(`${name}: no pixel benchmark for "${kind}", the user must confirm after the magenta overlay check`);
+      else if (!Number.isFinite(pct)) failures.push(`${name}: no measured difference`);
+      else if (pct > vp.LIMITS[kind]) failures.push(`${name}: ${pct} % > ${vp.LIMITS[kind]} % allowed for "${kind}"`);
+    }
+    const chk = vp.check();
+    if (!chk.ok) failures.push(`vp.check() failed (${chk.evenOddMismatch.length} even-odd mismatch, ${chk.strayMoves.length} stray move)`);
+    return { ok: !failures.length, failures };
+  };
+  vp.removeImage = function (panelIndex, imageId, evidence, opt = {}) {
+    const p = vp.panel(panelIndex); if (!p) throw new Error(`no panel ${panelIndex}`);
+    if (!p.images.some((i) => i.id === imageId)) throw new Error(`image ${imageId} not found on panel ${panelIndex}`);
+    const g = vp.gate(evidence);
+    const approval = typeof opt.userApproved === 'string' ? opt.userApproved.trim() : '';
+    const now = new Date().toISOString();
+    if (!g.ok && !approval) {
+      vp.log.push({ at: now, event: 'removal refused', panel: panelIndex, image: imageId, failures: g.failures });
+      throw new Error(`STOP, image kept. ${g.failures.join(' | ')}. Show this to the user and ask what to do. Retry with {userApproved: "<the user's own words>"} only if the user says so in the chat.`);
+    }
+    vp.exec((cimDoc) => { const imgs = cimDoc.document.panels[panelIndex].images; const k = imgs.findIndex((i) => i.id === imageId); if (k >= 0) imgs.splice(k, 1); });
+    const entry = { at: now, event: 'image removed', panel: panelIndex, image: imageId,
+      evidence: (Array.isArray(evidence) ? evidence : []).map((e) => ({ name: e && e.name, kind: e && e.kind, pct: pctOf(e && e.diff) })),
+      failures: g.failures, userApproved: g.ok ? null : approval };
+    vp.log.push(entry); return entry;
   };
   vp.fixStrayLines = function () { // outline-only lines whose first segment was lost: "M a b M c d" -> "M a b L c d"
     const ups = {};

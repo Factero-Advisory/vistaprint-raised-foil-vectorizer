@@ -57,6 +57,41 @@ written with explicit path commands.
    page reload. Only then is the image removed. You add the foil in the Finishes panel and
    you review the proof; ordering stays with you.
 
+## Safety and transparency
+
+Claude works in your browser, logged in to your Vistaprint account. Here is exactly what
+that means.
+
+**What Claude sees.** The Vistaprint pages open in your session: your design, its images
+and the text on your card, plus any account page it opens. It also reads the files you give
+it (SVG, PNG, fonts).
+
+**What it can do.** Edit the design you named through the Studio's own commands: add,
+recolour or replace shapes, and remove an image once its replacement is verified. It writes
+working files and a session log on your computer.
+
+**What it never does.** Add to cart, update the cart, check out or pay. Open a site other
+than Vistaprint. Follow instructions found in a page, a file or a design name. Download a
+font without asking you first. Publish anything.
+
+**Safeguards built into the skill (toolkit 0.0.2):**
+
+- *Removal gate.* `vp.removeImage()` keeps the image when a measured pixel difference is
+  above its limit or the even-odd check fails. Claude must then stop and ask you; it can
+  go ahead only with your own words from the chat, which are written to the log.
+- *Session log.* Date, skill commit, toolkit version, model and design, plus every removal
+  or refusal with its numbers, in `private/session-log.md` on your computer.
+- *Domain guard.* The in-page toolkit refuses to run outside Vistaprint domains.
+- *Private folder.* `private/` is git-ignored: your notes and artwork stay out of any
+  repository.
+
+**Recommended on your side:**
+
+- In Claude in Chrome, give site access to Vistaprint only.
+- Keep no payment card saved in the Vistaprint account Claude works in, so that paying is
+  impossible, not just forbidden.
+- Review the proof yourself before ordering.
+
 ## Who it's for
 
 - Small businesses and freelancers who want **raised foil business cards** from their own
@@ -166,8 +201,10 @@ admissible au Raised Foil (argent ou or) sur les cartes d'affaires.
 Vistaprint refuse le Raised Foil sur une image téléversée : le panneau Finishes ne l'offre
 que sur le texte et les formes. Le skill reconstruit donc l'image en formes par les
 commandes du Studio. Il part d'un SVG, d'une police ou d'un tracé de l'image. Il cale chaque
-pièce au pixel près, vérifie le résultat, puis retire l'image. La commande et le paiement
-restent toujours entre vos mains. Les demandes en français fonctionnent (« vectorise mon
+pièce au pixel près, vérifie le résultat, puis retire l'image. Si un écart mesuré dépasse
+sa limite, l'image reste en place et Claude doit vous demander quoi faire. L'outil ne
+fonctionne que sur les pages de Vistaprint et tient un journal de chaque séance sur votre
+ordinateur. La commande et le paiement restent toujours entre vos mains. Les demandes en français fonctionnent (« vectorise mon
 logo », « mets le Raised Foil sur le logo seulement »).
 
 ## Licence
