@@ -1,0 +1,17 @@
+vistaprint-raised-foil-vectorizer
+Copyright 2026 9467-8711 Québec inc. (Service conseils Factero)
+
+This product includes software developed by Factero (https://factero.ca/).
+
+Licensing
+- Code (scripts/): Apache License 2.0, see LICENSE.
+- Documentation (SKILL.md, README.md, references/): Creative Commons Attribution 4.0
+  International (CC BY 4.0), see LICENSE-DOCS. Attribution: "Factero (factero.ca)".
+- Bundled fonts (assets/fonts/): Epilogue, Copyright 2020 The Epilogue Project Authors
+  (https://github.com/Etcetera-Type-Co/Epilogue), SIL Open Font License 1.1, see
+  assets/fonts/OFL.txt.
+
+Trademarks
+- Vistaprint is a trademark of its respective owner. This project is independent and is
+  not affiliated with, endorsed by or sponsored by Vistaprint or Cimpress.
+- "Factero" and the Factero logo are not licensed under any of the licences above.

@@ -1,0 +1,8 @@
+# User-specific notes and source artwork: never published
+private/
+
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+*.zip

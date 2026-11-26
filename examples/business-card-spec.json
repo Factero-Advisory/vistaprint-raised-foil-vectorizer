@@ -1,0 +1,8 @@
+[
+  {"text": "Managing Partner", "style": "roman", "wght": 300, "size": 7},
+  {"text": "name@example.com", "style": "roman", "wght": 300, "size": 7},
+  {"text": "(555) 010-0199", "style": "roman", "wght": 300, "size": 7},
+  {"text": "JANE DOE", "style": "roman", "wght": 900, "size": 14},
+  {"text": "OUR INSIGHT,", "style": "roman", "wght": 900, "size": 14},
+  {"text": "YOUR DECISION.", "style": "italic", "wght": 900, "size": 14}
+]
